@@ -2,24 +2,26 @@ const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const app = express();
 
-app.use('/stream/:url(*)', createProxyMiddleware({
-  target: '',
-  changeOrigin: true,
-  secure: false,
-  router: req => {
-    const url = decodeURIComponent(req.params.url);
-    return url.startsWith('http') ? new URL(url).origin : '';
-  },
-  pathRewrite: (path, req) => {
-    const url = decodeURIComponent(req.params.url);
-    return new URL(url).pathname + new URL(url).search;
-  },
-  onProxyRes: (proxyRes) => {
-    proxyRes.headers['Access-Control-Allow-Origin'] = '*';
-    proxyRes.headers['Access-Control-Allow-Headers'] = '*';
-  }
-}));
+app.use('/stream/:url(*)', (req, res, next) => {
+  const targetUrl = decodeURIComponent(req.params.url);
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log('CORS proxy running');
+  if (!targetUrl.startsWith('http')) {
+    return res.status(400).send('Invalid URL');
+  }
+
+  createProxyMiddleware({
+    target: targetUrl,
+    changeOrigin: true,
+    secure: false,
+    pathRewrite: () => '',
+    onProxyRes: (proxyRes) => {
+      proxyRes.headers['Access-Control-Allow-Origin'] = '*';
+      proxyRes.headers['Access-Control-Allow-Headers'] = '*';
+    }
+  })(req, res, next);
+});
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`Proxy server listening on port ${port}`);
 });
